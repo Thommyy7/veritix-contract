@@ -1,5 +1,6 @@
 use crate::balance::{receive_balance, spend_balance};
 use crate::storage_types::{increment_counter, DataKey};
+use crate::validation::require_positive_amount;
 use soroban_sdk::{contracttype, Address, Env, Symbol};
 
 #[contracttype]
@@ -22,7 +23,10 @@ pub fn setup_recurring(
     amount: i128,
     interval: u32,
 ) -> u32 {
-    // 1. Authorization: The payer must explicitly authorize this recurring charge
+    // 1. Validate amount
+    require_positive_amount(amount);
+
+    // 2. Authorization: The payer must explicitly authorize this recurring charge
     payer.require_auth();
 
     // 2. Increment and get the new Recurring ID
@@ -49,6 +53,74 @@ pub fn setup_recurring(
     count
 }
 
-/// Executes a recurring payment if the interval has passed. 
+/// Executes a recurring payment if the interval has passed.
 /// Anyone can call this ("crank the contract"), but funds only move from payer to payee.
-pub fn execute_recurring(e: &Env, recurring_id: u
+pub fn execute_recurring(e: &Env, recurring_id: u32) {
+    let mut record: RecurringRecord = e
+        .storage()
+        .persistent()
+        .get(&DataKey::Recurring(recurring_id))
+        .unwrap_or_else(|| panic!("recurring record not found"));
+
+    if !record.active {
+        panic!("recurring payment is not active");
+    }
+
+    let current_ledger = e.ledger().sequence();
+    if current_ledger < record.last_charged_ledger + record.interval {
+        panic!("interval has not elapsed");
+    }
+
+    spend_balance(e, record.payer.clone(), record.amount);
+    receive_balance(e, record.payee.clone(), record.amount);
+
+    record.last_charged_ledger = current_ledger;
+    e.storage()
+        .persistent()
+        .set(&DataKey::Recurring(recurring_id), &record);
+
+    e.events().publish(
+        (
+            Symbol::new(e, "recurring"),
+            Symbol::new(e, "executed"),
+            recurring_id,
+        ),
+        record.amount,
+    );
+}
+
+/// Cancels a recurring payment. Only the payer can cancel.
+pub fn cancel_recurring(e: &Env, caller: Address, recurring_id: u32) {
+    caller.require_auth();
+
+    let mut record: RecurringRecord = e
+        .storage()
+        .persistent()
+        .get(&DataKey::Recurring(recurring_id))
+        .unwrap_or_else(|| panic!("recurring record not found"));
+
+    if record.payer != caller {
+        panic!("unauthorized");
+    }
+
+    record.active = false;
+    e.storage()
+        .persistent()
+        .set(&DataKey::Recurring(recurring_id), &record);
+
+    e.events().publish(
+        (
+            Symbol::new(e, "recurring"),
+            Symbol::new(e, "cancelled"),
+            recurring_id,
+        ),
+        caller,
+    );
+}
+
+pub fn get_recurring(e: &Env, recurring_id: u32) -> RecurringRecord {
+    e.storage()
+        .persistent()
+        .get(&DataKey::Recurring(recurring_id))
+        .unwrap_or_else(|| panic!("recurring record not found"))
+}

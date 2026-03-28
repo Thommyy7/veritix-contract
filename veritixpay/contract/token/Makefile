@@ -21,3 +21,11 @@ fmt:
 
 clean:
 	cargo clean
+
+# Deploy to localnet (set STELLAR_NETWORK=testnet for testnet)
+deploy:
+	bash $(CURDIR)/../../../scripts/deploy.sh
+
+# Invoke a contract function. Usage: make invoke ARGS="balance alice"
+invoke:
+	bash $(CURDIR)/../../../scripts/invoke.sh $(ARGS)

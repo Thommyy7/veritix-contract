@@ -2,6 +2,8 @@ use soroban_sdk::{contracttype, Address, Env, IntoVal, TryFromVal, Val};
 
 pub const BALANCE_LIFETIME_THRESHOLD: u32 = 518400; // ~30 days
 pub const BALANCE_BUMP_AMOUNT: u32 = 535000;
+pub const ALLOWANCE_LIFETIME_THRESHOLD: u32 = 518400; // ~30 days
+pub const ALLOWANCE_BUMP_AMOUNT: u32 = 535000;
 pub const INSTANCE_LIFETIME_THRESHOLD: u32 = 518400;
 pub const INSTANCE_BUMP_AMOUNT: u32 = 535000;
 

@@ -1,4 +1,6 @@
-use crate::storage_types::{AllowanceDataKey, AllowanceValue, DataKey};
+use crate::storage_types::{
+    AllowanceDataKey, AllowanceValue, DataKey, ALLOWANCE_BUMP_AMOUNT, ALLOWANCE_LIFETIME_THRESHOLD,
+};
 use crate::validation::{require_current_or_future_ledger, require_non_negative_amount};
 use soroban_sdk::{Address, Env};
 
@@ -16,11 +18,17 @@ pub fn read_allowance(e: &Env, from: Address, spender: Address) -> AllowanceValu
         // Equal-to-current-ledger approvals are still valid for the current ledger.
         // They become expired only once the sequence advances past expiration_ledger.
         if allowance.expiration_ledger < e.ledger().sequence() {
+            // Prune expired entry from storage
+            e.storage().persistent().remove(&key);
             AllowanceValue {
                 amount: 0,
                 expiration_ledger: allowance.expiration_ledger,
             }
         } else {
+            // Extend TTL on active allowance read
+            e.storage()
+                .persistent()
+                .extend_ttl(&key, ALLOWANCE_LIFETIME_THRESHOLD, ALLOWANCE_BUMP_AMOUNT);
             allowance
         }
     } else {

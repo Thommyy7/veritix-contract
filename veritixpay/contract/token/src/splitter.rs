@@ -1,6 +1,6 @@
 use crate::balance::{receive_balance, spend_balance};
-use crate::storage_types::{read_persistent_record, write_persistent_record, DataKey};
-use crate::storage_types::{increment_counter, DataKey};
+use crate::storage_types::{increment_counter, read_persistent_record, write_persistent_record, DataKey};
+use crate::validation::require_positive_amount;
 use soroban_sdk::{contracttype, Address, Env, Symbol, Vec};
 
 #[contracttype]
@@ -26,6 +26,7 @@ pub fn create_split(
     recipients: Vec<SplitRecipient>,
     total_amount: i128,
 ) -> u32 {
+    require_positive_amount(total_amount);
     sender.require_auth();
 
     // 1. Validate BPS Sums to 10000 (100.00%)
@@ -107,8 +108,4 @@ pub fn distribute(e: &Env, caller: Address, split_id: u32) {
 
 pub fn get_split(e: &Env, split_id: u32) -> SplitRecord {
     read_persistent_record(e, &DataKey::Split(split_id), "split record not found")
-    e.storage()
-        .persistent()
-        .get(&DataKey::Split(split_id))
-        .expect("split record not found")
 }

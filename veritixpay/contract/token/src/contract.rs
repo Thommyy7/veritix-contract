@@ -93,6 +93,7 @@ impl VeritixToken {
     /// Spender burns tokens from an account using their allowance.
     pub fn burn_from(e: Env, spender: Address, from: Address, amount: i128) {
         require_not_frozen_account(&e, &from);
+        require_not_frozen_account(&e, &spender);
         require_positive_amount(amount);
         spender.require_auth();
         spend_allowance(&e, from.clone(), spender.clone(), amount);
@@ -117,6 +118,7 @@ impl VeritixToken {
     /// Transfer tokens on behalf of a user via allowance.
     pub fn transfer_from(e: Env, spender: Address, from: Address, to: Address, amount: i128) {
         require_not_frozen_account(&e, &from);
+        require_not_frozen_account(&e, &spender);
         require_positive_amount(amount);
         spender.require_auth();
         spend_allowance(&e, from.clone(), spender.clone(), amount);
@@ -127,7 +129,9 @@ impl VeritixToken {
     }
 
     /// Sets an allowance for a spender.
+    /// Frozen accounts cannot create new approvals.
     pub fn approve(e: Env, from: Address, spender: Address, amount: i128, expiration_ledger: u32) {
+        require_not_frozen_account(&e, &from);
         from.require_auth();
         write_allowance(&e, from.clone(), spender.clone(), amount, expiration_ledger);
         e.events()
