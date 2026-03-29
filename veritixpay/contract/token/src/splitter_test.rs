@@ -1,96 +1,177 @@
-#[cfg(test)]
-mod splitter_tests {
-    use super::*;
-    // Replace with your actual environment imports (e.g., soroban_sdk or cosmwasm_std)
-    use crate::{Contract, Recipient}; 
+use soroban_sdk::{testutils::Address as _, Address, Env, Vec};
 
-    #[test]
-    fn test_create_split() {
-        let env = setup_env();
-        let sender = env.address("sender");
-        let total_amount = 10_000u128;
+use crate::balance::read_balance;
+use crate::contract::VeritixToken;
+use crate::splitter::{create_split, distribute, get_split, SplitRecipient};
 
-        // Verify record is stored and initial state is correct
-        let split_id = create_split(&env, &sender, total_amount);
-        let split = get_split(&env, split_id);
-        
-        assert_eq!(split.sender, sender);
-        assert_eq!(split.amount, total_amount);
-        // Add check for sender balance deduction here based on your ledger implementation
+fn setup_env() -> Env {
+    let e = Env::default();
+    e.mock_all_auths();
+    e
+}
+
+fn make_recipients(e: &Env, shares: &[(Address, u32)]) -> Vec<SplitRecipient> {
+    let mut v = Vec::new(e);
+    for (addr, bps) in shares {
+        v.push_back(SplitRecipient {
+            address: addr.clone(),
+            share_bps: *bps,
+        });
     }
+    v
+}
 
-    #[test]
-    fn test_distribute_two_recipients() {
-        let env = setup_env();
-        let recipients = vec![
-            Recipient { addr: env.address("u1"), bps: 5000 },
-            Recipient { addr: env.address("u2"), bps: 5000 },
-        ];
-        
-        let results = calculate_distribution(1000, &recipients);
-        assert_eq!(results[0].amount, 500);
-        assert_eq!(results[1].amount, 500);
-    }
+#[test]
+fn test_create_split_stores_record() {
+    let e = setup_env();
+    let contract_id = e.register_contract(None, VeritixToken);
+    let sender = Address::generate(&e);
+    let r1 = Address::generate(&e);
+    let r2 = Address::generate(&e);
 
-    #[test]
-    fn test_distribute_three_recipients() {
-        let env = setup_env();
-        let recipients = vec![
-            Recipient { addr: env.address("u1"), bps: 5000 },
-            Recipient { addr: env.address("u2"), bps: 3000 },
-            Recipient { addr: env.address("u3"), bps: 2000 },
-        ];
-        
-        let results = calculate_distribution(1000, &recipients);
-        assert_eq!(results[0].amount, 500);
-        assert_eq!(results[1].amount, 300);
-        assert_eq!(results[2].amount, 200);
-    }
+    e.as_contract(&contract_id, || {
+        crate::balance::receive_balance(&e, sender.clone(), 1000);
+        let recipients = make_recipients(&e, &[(r1.clone(), 5000), (r2.clone(), 5000)]);
+        let split_id = create_split(&e, sender.clone(), recipients, 1000);
+        let record = get_split(&e, split_id);
+        assert_eq!(record.sender, sender);
+        assert_eq!(record.total_amount, 1000);
+        assert!(!record.distributed);
+    });
+}
 
-    #[test]
-    #[should_panic(expected = "BPS_SUM_MUST_BE_10000")]
-    fn test_invalid_bps_panics() {
-        let recipients = vec![Recipient { addr: "u1", bps: 9999 }];
-        validate_split_config(&recipients);
-    }
+#[test]
+fn test_distribute_two_recipients_equal_split() {
+    let e = setup_env();
+    let contract_id = e.register_contract(None, VeritixToken);
+    let sender = Address::generate(&e);
+    let r1 = Address::generate(&e);
+    let r2 = Address::generate(&e);
 
-    #[test]
-    #[should_panic(expected = "ALREADY_DISTRIBUTED")]
-    fn test_double_distribute_panics() {
-        let mut split = setup_active_split();
-        distribute(&mut split); // First call
-        distribute(&mut split); // Should panic
-    }
+    e.as_contract(&contract_id, || {
+        crate::balance::receive_balance(&e, sender.clone(), 1000);
+        let recipients = make_recipients(&e, &[(r1.clone(), 5000), (r2.clone(), 5000)]);
+        let split_id = create_split(&e, sender.clone(), recipients, 1000);
+        distribute(&e, sender.clone(), split_id);
+        assert_eq!(read_balance(&e, r1.clone()), 500);
+        assert_eq!(read_balance(&e, r2.clone()), 500);
+        assert!(get_split(&e, split_id).distributed);
+    });
+}
 
-    #[test]
-    #[should_panic(expected = "UNAUTHORIZED")]
-    fn test_distribute_unauthorized_panics() {
-        let env = setup_env();
-        let hacker = env.address("hacker");
-        distribute_as(&env, hacker, split_id);
-    }
+#[test]
+fn test_distribute_rounding_dust_goes_to_last_recipient() {
+    let e = setup_env();
+    let contract_id = e.register_contract(None, VeritixToken);
+    let sender = Address::generate(&e);
+    let r1 = Address::generate(&e);
+    let r2 = Address::generate(&e);
+    let r3 = Address::generate(&e);
 
-    #[test]
-    fn test_distribute_rounds_correctly() {
-        let env = setup_env();
-        // Case: 10 units split between 3 people (3333, 3333, 3334 BPS)
-        let recipients = vec![
-            Recipient { addr: env.address("u1"), bps: 3333 },
-            Recipient { addr: env.address("u2"), bps: 3333 },
-            Recipient { addr: env.address("u3"), bps: 3334 },
-        ];
+    e.as_contract(&contract_id, || {
+        crate::balance::receive_balance(&e, sender.clone(), 10);
+        // 3333 + 3333 + 3334 = 10000 bps; 10 units → 3 + 3 + 4
+        let recipients = make_recipients(
+            &e,
+            &[(r1.clone(), 3333), (r2.clone(), 3333), (r3.clone(), 3334)],
+        );
+        let split_id = create_split(&e, sender.clone(), recipients, 10);
+        distribute(&e, sender.clone(), split_id);
+        assert_eq!(read_balance(&e, r1.clone()), 3);
+        assert_eq!(read_balance(&e, r2.clone()), 3);
+        assert_eq!(read_balance(&e, r3.clone()), 4);
+    });
+}
 
-        let total = 10u128;
-        let shares = calculate_distribution(total, &recipients);
-        
-        let sum: u128 = shares.iter().map(|s| s.amount).sum();
-        
-        // Mathematically: (3.333) + (3.333) + (3.334) = 10.0
-        // In integer math: 3 + 3 + 3 = 9. 
-        // We must ensure the sum equals the total.
-        assert_eq!(sum, total, "Rounding error: Dust remaining in contract");
-        assert_eq!(shares[0].amount, 3);
-        assert_eq!(shares[1].amount, 3);
-        assert_eq!(shares[2].amount, 4); // Last recipient picks up the remainder
-    }
+#[test]
+#[should_panic(expected = "unauthorized")]
+fn test_distribute_unauthorized_panics() {
+    let e = setup_env();
+    let contract_id = e.register_contract(None, VeritixToken);
+    let sender = Address::generate(&e);
+    let hacker = Address::generate(&e);
+    let r1 = Address::generate(&e);
+
+    e.as_contract(&contract_id, || {
+        crate::balance::receive_balance(&e, sender.clone(), 1000);
+        let recipients = make_recipients(&e, &[(r1.clone(), 10000)]);
+        let split_id = create_split(&e, sender.clone(), recipients, 1000);
+        distribute(&e, hacker.clone(), split_id);
+    });
+}
+
+#[test]
+#[should_panic(expected = "already distributed")]
+fn test_double_distribute_panics() {
+    let e = setup_env();
+    let contract_id = e.register_contract(None, VeritixToken);
+    let sender = Address::generate(&e);
+    let r1 = Address::generate(&e);
+
+    e.as_contract(&contract_id, || {
+        crate::balance::receive_balance(&e, sender.clone(), 1000);
+        let recipients = make_recipients(&e, &[(r1.clone(), 10000)]);
+        let split_id = create_split(&e, sender.clone(), recipients, 1000);
+        distribute(&e, sender.clone(), split_id);
+        distribute(&e, sender.clone(), split_id);
+    });
+}
+
+#[test]
+#[should_panic(expected = "recipients list cannot be empty")]
+fn test_create_split_rejects_empty_recipients() {
+    let e = setup_env();
+    let contract_id = e.register_contract(None, VeritixToken);
+    let sender = Address::generate(&e);
+
+    e.as_contract(&contract_id, || {
+        crate::balance::receive_balance(&e, sender.clone(), 1000);
+        let recipients: Vec<SplitRecipient> = Vec::new(&e);
+        create_split(&e, sender.clone(), recipients, 1000);
+    });
+}
+
+#[test]
+#[should_panic(expected = "recipient share_bps cannot be zero")]
+fn test_create_split_rejects_zero_share_recipient() {
+    let e = setup_env();
+    let contract_id = e.register_contract(None, VeritixToken);
+    let sender = Address::generate(&e);
+    let r1 = Address::generate(&e);
+    let r2 = Address::generate(&e);
+
+    e.as_contract(&contract_id, || {
+        crate::balance::receive_balance(&e, sender.clone(), 1000);
+        let recipients = make_recipients(&e, &[(r1.clone(), 10000), (r2.clone(), 0)]);
+        create_split(&e, sender.clone(), recipients, 1000);
+    });
+}
+
+#[test]
+#[should_panic(expected = "duplicate recipient address")]
+fn test_create_split_rejects_duplicate_recipients() {
+    let e = setup_env();
+    let contract_id = e.register_contract(None, VeritixToken);
+    let sender = Address::generate(&e);
+    let r1 = Address::generate(&e);
+
+    e.as_contract(&contract_id, || {
+        crate::balance::receive_balance(&e, sender.clone(), 1000);
+        let recipients = make_recipients(&e, &[(r1.clone(), 5000), (r1.clone(), 5000)]);
+        create_split(&e, sender.clone(), recipients, 1000);
+    });
+}
+
+#[test]
+#[should_panic(expected = "amount must be positive")]
+fn test_create_split_rejects_non_positive_amount() {
+    let e = setup_env();
+    let contract_id = e.register_contract(None, VeritixToken);
+    let sender = Address::generate(&e);
+    let r1 = Address::generate(&e);
+
+    e.as_contract(&contract_id, || {
+        let recipients = make_recipients(&e, &[(r1.clone(), 10000)]);
+        create_split(&e, sender.clone(), recipients, 0);
+    });
 }

@@ -29,10 +29,24 @@ pub fn create_split(
     require_positive_amount(total_amount);
     sender.require_auth();
 
-    // 1. Validate BPS Sums to 10000 (100.00%)
+    // 1. Reject empty recipient list
+    if recipients.is_empty() {
+        panic!("recipients list cannot be empty");
+    }
+
+    // 2. Validate recipients: no zero-share, no duplicates; BPS sums to 10000
     let mut total_bps: u32 = 0;
-    for recipient in recipients.iter() {
-        total_bps += recipient.share_bps;
+    for i in 0..recipients.len() {
+        let r = recipients.get(i).unwrap();
+        if r.share_bps == 0 {
+            panic!("recipient share_bps cannot be zero");
+        }
+        for j in (i + 1)..recipients.len() {
+            if r.address == recipients.get(j).unwrap().address {
+                panic!("duplicate recipient address");
+            }
+        }
+        total_bps += r.share_bps;
     }
     if total_bps != 10000 {
         panic!("total bps must equal 10000");

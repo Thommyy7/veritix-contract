@@ -7,9 +7,11 @@
 pub mod admin;
 pub mod allowance;
 pub mod balance;
+pub mod dispute;
 pub mod escrow;
 pub mod freeze;
 pub mod metadata;
+pub mod splitter;
 pub mod storage_types;
 pub mod validation;
 
@@ -23,5 +25,11 @@ mod escrow_test;
 
 #[cfg(test)]
 mod admin_test;
+
+#[cfg(test)]
+mod splitter_test;
+
+#[cfg(test)]
+mod dispute_test;
 
 pub use crate::contract::VeritixToken;

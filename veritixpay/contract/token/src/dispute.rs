@@ -1,5 +1,6 @@
-use crate::escrow::{get_escrow, release_escrow, refund_escrow};
-use crate::storage_types::{increment_counter, DataKey};
+use crate::balance::{receive_balance, spend_balance};
+use crate::escrow::get_escrow;
+use crate::storage_types::{increment_counter, write_persistent_record, DataKey};
 use soroban_sdk::{contracttype, Address, Env, Symbol};
 
 #[contracttype]
@@ -27,26 +28,20 @@ pub fn open_dispute(
     escrow_id: u32,
     resolver: Address,
 ) -> u32 {
-    // 1. Authorization: Only the claimant can initiate this call
     claimant.require_auth();
 
-    // 2. Fetch escrow and validate current state
     let escrow = get_escrow(e, escrow_id);
-    
-    // Check if the escrow is already finalized
+
     if escrow.released || escrow.refunded {
         panic!("InvalidState: Cannot open dispute on a settled escrow");
     }
 
-    // 3. Authorization check: Claimant must be a party involved in the escrow
     if claimant != escrow.depositor && claimant != escrow.beneficiary {
         panic!("Unauthorized: Only depositor or beneficiary can open a dispute");
     }
 
-    // 4. Generate a new Dispute ID using the counter in storage
     let count = increment_counter(e, &DataKey::DisputeCount);
 
-    // 5. Create and store the dispute record
     let record = DisputeRecord {
         id: count,
         escrow_id,
@@ -54,68 +49,88 @@ pub fn open_dispute(
         resolver,
         status: DisputeStatus::Open,
     };
-    
-    // Store in persistent storage as disputes may last longer than instance TTL
+
     e.storage().persistent().set(&DataKey::Dispute(count), &record);
 
-    // 6. Emit Observability Event
     e.events().publish(
         (Symbol::new(e, "dispute"), Symbol::new(e, "opened"), escrow_id),
-        claimant
+        claimant,
     );
 
     count
 }
 
-/// Resolves an open dispute.
+/// Private helper: settle an escrow by outcome without requiring depositor/beneficiary auth.
+/// The resolver has already been authenticated by `resolve_dispute`.
+fn settle_escrow_by_outcome(e: &Env, escrow_id: u32, release_to_beneficiary: bool) {
+    let mut escrow = get_escrow(e, escrow_id);
+
+    if escrow.released || escrow.refunded {
+        panic!("AlreadySettled: escrow is already settled");
+    }
+
+    if release_to_beneficiary {
+        escrow.released = true;
+        write_persistent_record(e, &DataKey::Escrow(escrow_id), &escrow);
+        spend_balance(e, e.current_contract_address(), escrow.amount);
+        receive_balance(e, escrow.beneficiary.clone(), escrow.amount);
+        e.events().publish(
+            (Symbol::new(e, "escrow"), Symbol::new(e, "released"), escrow_id),
+            escrow.beneficiary,
+        );
+    } else {
+        escrow.refunded = true;
+        write_persistent_record(e, &DataKey::Escrow(escrow_id), &escrow);
+        spend_balance(e, e.current_contract_address(), escrow.amount);
+        receive_balance(e, escrow.depositor.clone(), escrow.amount);
+        e.events().publish(
+            (Symbol::new(e, "escrow"), Symbol::new(e, "refunded"), escrow_id),
+            escrow.depositor,
+        );
+    }
+}
+
+/// Resolves an open dispute. Only the designated resolver can call this.
+/// Settlement does not require beneficiary/depositor auth.
 pub fn resolve_dispute(
     e: &Env,
     resolver: Address,
     dispute_id: u32,
     release_to_beneficiary: bool,
 ) {
-    // 1. Authorization: Only the designated resolver can resolve the dispute
     resolver.require_auth();
 
-    // 2. Fetch the dispute record
     let mut dispute: DisputeRecord = e
         .storage()
         .persistent()
         .get(&DataKey::Dispute(dispute_id))
         .expect("Dispute not found");
 
-    // 3. Validation: Check if already resolved (Double-resolution panic)
     if dispute.status != DisputeStatus::Open {
         panic!("AlreadyResolved: This dispute has already been resolved");
     }
 
-    // 4. Validation: Verify the resolver matches the record
     if dispute.resolver != resolver {
         panic!("UnauthorizedResolver: Only the designated resolver can resolve this");
     }
 
-    // 5. Execute resolution by calling the core escrow logic
-    if release_to_beneficiary {
-        // Triggers the standard release logic from escrow.rs
-        release_escrow(e, dispute.escrow_id);
-        dispute.status = DisputeStatus::ResolvedForBeneficiary;
-    } else {
-        // Triggers the standard refund logic from escrow.rs
-        refund_escrow(e, dispute.escrow_id);
-        dispute.status = DisputeStatus::ResolvedForDepositor;
-    }
+    settle_escrow_by_outcome(e, dispute.escrow_id, release_to_beneficiary);
 
-    // 6. Persist the updated dispute status
+    dispute.status = if release_to_beneficiary {
+        DisputeStatus::ResolvedForBeneficiary
+    } else {
+        DisputeStatus::ResolvedForDepositor
+    };
+
     e.storage().persistent().set(&DataKey::Dispute(dispute_id), &dispute);
 
-    // 7. Emit Observability Event
     e.events().publish(
         (Symbol::new(e, "dispute"), Symbol::new(e, "resolved"), dispute_id),
-        release_to_beneficiary
+        release_to_beneficiary,
     );
 }
 
-/// Helper to read a dispute record
+/// Helper to read a dispute record.
 pub fn get_dispute(e: &Env, dispute_id: u32) -> DisputeRecord {
     e.storage()
         .persistent()

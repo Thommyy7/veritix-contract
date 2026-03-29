@@ -4,12 +4,21 @@ use crate::balance::{
     decrease_supply, increase_supply, read_balance, read_total_supply, receive_balance,
     spend_balance,
 };
+use crate::dispute::{get_dispute as dispute_get, open_dispute, resolve_dispute, DisputeRecord};
+use crate::escrow::{
+    create_escrow as escrow_create, get_escrow as escrow_get, refund_escrow as escrow_refund,
+    release_escrow as escrow_release, EscrowRecord,
+};
 use crate::freeze::{freeze_account, is_frozen as read_frozen_status, unfreeze_account};
 use crate::metadata::{
     read_decimal, read_name, read_symbol, validate_metadata, write_metadata, TokenMetadata,
 };
+use crate::splitter::{
+    create_split as split_create, distribute as split_distribute, get_split as split_get,
+    SplitRecord, SplitRecipient,
+};
 use crate::validation::{require_not_frozen_account, require_positive_amount};
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Vec};
 
 #[contract]
 pub struct VeritixToken;
@@ -170,5 +179,66 @@ impl VeritixToken {
 
     pub fn symbol(e: Env) -> String {
         read_symbol(&e)
+    }
+
+    // --- Escrow ---
+
+    pub fn create_escrow(e: Env, depositor: Address, beneficiary: Address, amount: i128) -> u32 {
+        escrow_create(&e, depositor, beneficiary, amount)
+    }
+
+    pub fn release_escrow(e: Env, caller: Address, escrow_id: u32) {
+        escrow_release(&e, caller, escrow_id)
+    }
+
+    pub fn refund_escrow(e: Env, caller: Address, escrow_id: u32) {
+        escrow_refund(&e, caller, escrow_id)
+    }
+
+    pub fn get_escrow(e: Env, escrow_id: u32) -> EscrowRecord {
+        escrow_get(&e, escrow_id)
+    }
+
+    // --- Dispute ---
+
+    pub fn open_dispute(
+        e: Env,
+        claimant: Address,
+        escrow_id: u32,
+        resolver: Address,
+    ) -> u32 {
+        open_dispute(&e, claimant, escrow_id, resolver)
+    }
+
+    pub fn resolve_dispute(
+        e: Env,
+        resolver: Address,
+        dispute_id: u32,
+        release_to_beneficiary: bool,
+    ) {
+        resolve_dispute(&e, resolver, dispute_id, release_to_beneficiary)
+    }
+
+    pub fn get_dispute(e: Env, dispute_id: u32) -> DisputeRecord {
+        dispute_get(&e, dispute_id)
+    }
+
+    // --- Splitter ---
+
+    pub fn create_split(
+        e: Env,
+        sender: Address,
+        recipients: Vec<SplitRecipient>,
+        total_amount: i128,
+    ) -> u32 {
+        split_create(&e, sender, recipients, total_amount)
+    }
+
+    pub fn distribute(e: Env, caller: Address, split_id: u32) {
+        split_distribute(&e, caller, split_id)
+    }
+
+    pub fn get_split(e: Env, split_id: u32) -> SplitRecord {
+        split_get(&e, split_id)
     }
 }
