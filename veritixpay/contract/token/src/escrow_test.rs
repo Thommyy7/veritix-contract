@@ -219,6 +219,37 @@ fn test_create_escrow_increments_counter() {
 
     e.as_contract(&contract_id, || {
         assert_eq!(read_counter(&e, &DataKey::EscrowCount), 2);
+        // Also test the public getter
+        assert_eq!(VeritixToken::escrow_count(e.clone()), 2);
+    });
+}
+
+#[test]
+fn test_escrow_count_getter_reflects_creations() {
+    let e = setup_env();
+    let contract_id = e.register_contract(None, VeritixToken);
+    let beneficiary = Address::generate(&e);
+    let amount = 1_000i128;
+
+    // Initially zero
+    e.as_contract(&contract_id, || {
+        assert_eq!(VeritixToken::escrow_count(e.clone()), 0);
+    });
+
+    // Create one escrow
+    let depositor_one = Address::generate(&e);
+    e.as_contract(&contract_id, || {
+        crate::balance::receive_balance(&e, depositor_one.clone(), amount);
+        let _ = VeritixToken::create_escrow(e.clone(), depositor_one.clone(), beneficiary.clone(), amount);
+        assert_eq!(VeritixToken::escrow_count(e.clone()), 1);
+    });
+
+    // Create another escrow
+    let depositor_two = Address::generate(&e);
+    e.as_contract(&contract_id, || {
+        crate::balance::receive_balance(&e, depositor_two.clone(), amount);
+        let _ = VeritixToken::create_escrow(e.clone(), depositor_two.clone(), beneficiary.clone(), amount);
+        assert_eq!(VeritixToken::escrow_count(e.clone()), 2);
     });
 }
 
