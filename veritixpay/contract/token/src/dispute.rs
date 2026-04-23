@@ -41,6 +41,8 @@ pub fn open_dispute(
     }
 
     // Prevent multiple open disputes for the same escrow.
+    // NOTE: All validation must complete before incrementing the counter so that
+    // rejected calls do not consume a dispute ID and leave gaps in the sequence.
     if e.storage()
         .persistent()
         .has(&DataKey::EscrowDispute(escrow_id))
@@ -48,6 +50,7 @@ pub fn open_dispute(
         panic!("DisputeAlreadyOpen: An open dispute already exists for this escrow");
     }
 
+    // Increment only after all validation passes — counter must not advance on rejected calls.
     let count = increment_counter(e, &DataKey::DisputeCount);
 
     let record = DisputeRecord {
