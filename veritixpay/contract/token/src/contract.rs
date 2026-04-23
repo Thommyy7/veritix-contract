@@ -17,8 +17,8 @@ use crate::recurring::{
     cancel_recurring, execute_recurring, get_recurring, setup_recurring, RecurringRecord,
 };
 use crate::splitter::{
-    create_split as split_create, distribute as split_distribute, get_split as split_get,
-    SplitRecord, SplitRecipient,
+    cancel_split as split_cancel, create_split as split_create, distribute as split_distribute,
+    get_split as split_get, SplitRecipient, SplitRecord,
 };
 use crate::validation::{require_not_frozen_account, require_positive_amount};
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Vec};
@@ -89,7 +89,8 @@ impl VeritixToken {
         require_positive_amount(amount);
         receive_balance(&e, to.clone(), amount);
         increase_supply(&e, amount);
-        e.events().publish((symbol_short!("mint"), admin, to), amount);
+        e.events()
+            .publish((symbol_short!("mint"), admin, to), amount);
     }
 
     /// Caller burns their own tokens.
@@ -111,7 +112,8 @@ impl VeritixToken {
         spend_allowance(&e, from.clone(), spender.clone(), amount);
         spend_balance(&e, from.clone(), amount);
         decrease_supply(&e, amount);
-        e.events().publish((symbol_short!("burn"), spender, from), amount);
+        e.events()
+            .publish((symbol_short!("burn"), spender, from), amount);
     }
 
     // --- Transfers & allowance ---
@@ -209,12 +211,7 @@ impl VeritixToken {
 
     // --- Dispute ---
 
-    pub fn open_dispute(
-        e: Env,
-        claimant: Address,
-        escrow_id: u32,
-        resolver: Address,
-    ) -> u32 {
+    pub fn open_dispute(e: Env, claimant: Address, escrow_id: u32, resolver: Address) -> u32 {
         open_dispute(&e, claimant, escrow_id, resolver)
     }
 
@@ -244,6 +241,10 @@ impl VeritixToken {
 
     pub fn distribute(e: Env, caller: Address, split_id: u32) {
         split_distribute(&e, caller, split_id)
+    }
+
+    pub fn cancel_split(e: Env, caller: Address, split_id: u32) {
+        split_cancel(&e, caller, split_id)
     }
 
     pub fn get_split(e: Env, split_id: u32) -> SplitRecord {

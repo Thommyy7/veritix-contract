@@ -44,7 +44,6 @@ mod admin_test {
     }
 }
 
-
 #[cfg(test)]
 mod admin_test {
     use soroban_sdk::{testutils::Address as _, Address, Env};

@@ -1,13 +1,16 @@
-use soroban_sdk::{testutils::{Address as _, Events as _}, Address, Env};
+use soroban_sdk::{
+    testutils::{Address as _, Events as _},
+    Address, Env,
+};
 
+use crate::balance::increase_supply;
 use crate::balance::read_balance;
+use crate::balance::read_total_supply;
 use crate::contract::VeritixToken;
 use crate::escrow::{
     create_escrow, get_escrow, refund_escrow, release_escrow, try_get_escrow, try_refund_escrow,
     try_release_escrow,
 };
-use crate::balance::read_total_supply;
-use crate::balance::increase_supply;
 use crate::storage_types::{read_counter, DataKey};
 
 // Helper to create a fresh Env with mock auth enabled.
@@ -144,13 +147,21 @@ fn test_escrow_create_and_release_preserve_supply_invariant() {
         increase_supply(&e, amount);
         assert_supply_matches_balances(
             &e,
-            &[depositor.clone(), beneficiary.clone(), e.current_contract_address()],
+            &[
+                depositor.clone(),
+                beneficiary.clone(),
+                e.current_contract_address(),
+            ],
         );
 
         escrow_id = create_escrow(&e, depositor.clone(), beneficiary.clone(), amount, 1000);
         assert_supply_matches_balances(
             &e,
-            &[depositor.clone(), beneficiary.clone(), e.current_contract_address()],
+            &[
+                depositor.clone(),
+                beneficiary.clone(),
+                e.current_contract_address(),
+            ],
         );
     });
 
@@ -158,7 +169,11 @@ fn test_escrow_create_and_release_preserve_supply_invariant() {
         release_escrow(&e, beneficiary.clone(), escrow_id);
         assert_supply_matches_balances(
             &e,
-            &[depositor.clone(), beneficiary.clone(), e.current_contract_address()],
+            &[
+                depositor.clone(),
+                beneficiary.clone(),
+                e.current_contract_address(),
+            ],
         );
     });
 }
@@ -177,13 +192,21 @@ fn test_escrow_create_and_refund_preserve_supply_invariant() {
         increase_supply(&e, amount);
         assert_supply_matches_balances(
             &e,
-            &[depositor.clone(), beneficiary.clone(), e.current_contract_address()],
+            &[
+                depositor.clone(),
+                beneficiary.clone(),
+                e.current_contract_address(),
+            ],
         );
 
         escrow_id = create_escrow(&e, depositor.clone(), beneficiary.clone(), amount, 1000);
         assert_supply_matches_balances(
             &e,
-            &[depositor.clone(), beneficiary.clone(), e.current_contract_address()],
+            &[
+                depositor.clone(),
+                beneficiary.clone(),
+                e.current_contract_address(),
+            ],
         );
     });
 
@@ -191,7 +214,11 @@ fn test_escrow_create_and_refund_preserve_supply_invariant() {
         refund_escrow(&e, depositor.clone(), escrow_id);
         assert_supply_matches_balances(
             &e,
-            &[depositor.clone(), beneficiary.clone(), e.current_contract_address()],
+            &[
+                depositor.clone(),
+                beneficiary.clone(),
+                e.current_contract_address(),
+            ],
         );
     });
 }
@@ -240,7 +267,12 @@ fn test_escrow_count_getter_reflects_creations() {
     let depositor_one = Address::generate(&e);
     e.as_contract(&contract_id, || {
         crate::balance::receive_balance(&e, depositor_one.clone(), amount);
-        let _ = VeritixToken::create_escrow(e.clone(), depositor_one.clone(), beneficiary.clone(), amount, 1000);
+        let _ = VeritixToken::create_escrow(
+            e.clone(),
+            depositor_one.clone(),
+            beneficiary.clone(),
+            amount,
+        );
         assert_eq!(VeritixToken::escrow_count(e.clone()), 1);
     });
 
@@ -248,7 +280,12 @@ fn test_escrow_count_getter_reflects_creations() {
     let depositor_two = Address::generate(&e);
     e.as_contract(&contract_id, || {
         crate::balance::receive_balance(&e, depositor_two.clone(), amount);
-        let _ = VeritixToken::create_escrow(e.clone(), depositor_two.clone(), beneficiary.clone(), amount, 1000);
+        let _ = VeritixToken::create_escrow(
+            e.clone(),
+            depositor_two.clone(),
+            beneficiary.clone(),
+            amount,
+        );
         assert_eq!(VeritixToken::escrow_count(e.clone()), 2);
     });
 }

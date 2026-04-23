@@ -48,8 +48,7 @@ fn test_resolve_dispute_for_beneficiary() {
     let (_depositor, beneficiary, escrow_id) = setup_escrow(&e, &contract_id);
 
     e.as_contract(&contract_id, || {
-        let dispute_id =
-            open_dispute(&e, beneficiary.clone(), escrow_id, resolver.clone());
+        let dispute_id = open_dispute(&e, beneficiary.clone(), escrow_id, resolver.clone());
         resolve_dispute(&e, resolver.clone(), dispute_id, true);
 
         let record = get_dispute(&e, dispute_id);
@@ -70,8 +69,7 @@ fn test_resolve_dispute_for_depositor() {
     let (depositor, _beneficiary, escrow_id) = setup_escrow(&e, &contract_id);
 
     e.as_contract(&contract_id, || {
-        let dispute_id =
-            open_dispute(&e, depositor.clone(), escrow_id, resolver.clone());
+        let dispute_id = open_dispute(&e, depositor.clone(), escrow_id, resolver.clone());
         resolve_dispute(&e, resolver.clone(), dispute_id, false);
 
         let record = get_dispute(&e, dispute_id);
@@ -162,5 +160,43 @@ fn test_reopen_dispute_after_resolution() {
         let new_id = open_dispute(&e, depositor2.clone(), escrow_id2, resolver.clone());
         let record = get_dispute(&e, new_id);
         assert_eq!(record.status, DisputeStatus::Open);
+    });
+}
+
+#[test]
+#[should_panic(expected = "InvalidResolver: resolver cannot be the claimant")]
+fn test_open_dispute_rejects_claimant_as_resolver() {
+    let e = setup_env();
+    let contract_id = e.register_contract(None, VeritixToken);
+    let (depositor, _beneficiary, escrow_id) = setup_escrow(&e, &contract_id);
+
+    e.as_contract(&contract_id, || {
+        open_dispute(&e, depositor.clone(), escrow_id, depositor.clone());
+    });
+}
+
+#[test]
+#[should_panic(expected = "InvalidResolver: resolver cannot be the depositor")]
+fn test_open_dispute_rejects_depositor_as_resolver() {
+    let e = setup_env();
+    let contract_id = e.register_contract(None, VeritixToken);
+    let (_depositor, beneficiary, escrow_id) = setup_escrow(&e, &contract_id);
+
+    e.as_contract(&contract_id, || {
+        let escrow = get_escrow(&e, escrow_id);
+        open_dispute(&e, beneficiary.clone(), escrow_id, escrow.depositor.clone());
+    });
+}
+
+#[test]
+#[should_panic(expected = "InvalidResolver: resolver cannot be the beneficiary")]
+fn test_open_dispute_rejects_beneficiary_as_resolver() {
+    let e = setup_env();
+    let contract_id = e.register_contract(None, VeritixToken);
+    let (depositor, _beneficiary, escrow_id) = setup_escrow(&e, &contract_id);
+
+    e.as_contract(&contract_id, || {
+        let escrow = get_escrow(&e, escrow_id);
+        open_dispute(&e, depositor.clone(), escrow_id, escrow.beneficiary.clone());
     });
 }

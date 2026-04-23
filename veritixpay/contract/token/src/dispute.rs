@@ -22,12 +22,7 @@ pub struct DisputeRecord {
 }
 
 /// Opens a dispute against an existing escrow.
-pub fn open_dispute(
-    e: &Env,
-    claimant: Address,
-    escrow_id: u32,
-    resolver: Address,
-) -> u32 {
+pub fn open_dispute(e: &Env, claimant: Address, escrow_id: u32, resolver: Address) -> u32 {
     claimant.require_auth();
 
     let escrow = get_escrow(e, escrow_id);
@@ -38,6 +33,15 @@ pub fn open_dispute(
 
     if claimant != escrow.depositor && claimant != escrow.beneficiary {
         panic!("Unauthorized: Only depositor or beneficiary can open a dispute");
+    }
+    if resolver == claimant {
+        panic!("InvalidResolver: resolver cannot be the claimant");
+    }
+    if resolver == escrow.depositor {
+        panic!("InvalidResolver: resolver cannot be the depositor");
+    }
+    if resolver == escrow.beneficiary {
+        panic!("InvalidResolver: resolver cannot be the beneficiary");
     }
 
     // Prevent multiple open disputes for the same escrow.
@@ -61,7 +65,9 @@ pub fn open_dispute(
         status: DisputeStatus::Open,
     };
 
-    e.storage().persistent().set(&DataKey::Dispute(count), &record);
+    e.storage()
+        .persistent()
+        .set(&DataKey::Dispute(count), &record);
     e.storage()
         .persistent()
         .set(&DataKey::EscrowDispute(escrow_id), &count);
@@ -89,7 +95,11 @@ fn settle_escrow_by_outcome(e: &Env, escrow_id: u32, release_to_beneficiary: boo
         spend_balance(e, e.current_contract_address(), escrow.amount);
         receive_balance(e, escrow.beneficiary.clone(), escrow.amount);
         e.events().publish(
-            (symbol_short!("escrow_released"), escrow_id, escrow.beneficiary.clone()),
+            (
+                symbol_short!("escrow_released"),
+                escrow_id,
+                escrow.beneficiary.clone(),
+            ),
             escrow.amount,
         );
     } else {
@@ -98,7 +108,11 @@ fn settle_escrow_by_outcome(e: &Env, escrow_id: u32, release_to_beneficiary: boo
         spend_balance(e, e.current_contract_address(), escrow.amount);
         receive_balance(e, escrow.depositor.clone(), escrow.amount);
         e.events().publish(
-            (symbol_short!("escrow_refunded"), escrow_id, escrow.depositor.clone()),
+            (
+                symbol_short!("escrow_refunded"),
+                escrow_id,
+                escrow.depositor.clone(),
+            ),
             escrow.amount,
         );
     }
@@ -106,12 +120,7 @@ fn settle_escrow_by_outcome(e: &Env, escrow_id: u32, release_to_beneficiary: boo
 
 /// Resolves an open dispute. Only the designated resolver can call this.
 /// Settlement does not require beneficiary/depositor auth.
-pub fn resolve_dispute(
-    e: &Env,
-    resolver: Address,
-    dispute_id: u32,
-    release_to_beneficiary: bool,
-) {
+pub fn resolve_dispute(e: &Env, resolver: Address, dispute_id: u32, release_to_beneficiary: bool) {
     resolver.require_auth();
 
     let mut dispute: DisputeRecord = e
@@ -136,7 +145,9 @@ pub fn resolve_dispute(
         DisputeStatus::ResolvedForDepositor
     };
 
-    e.storage().persistent().set(&DataKey::Dispute(dispute_id), &dispute);
+    e.storage()
+        .persistent()
+        .set(&DataKey::Dispute(dispute_id), &dispute);
     e.storage()
         .persistent()
         .remove(&DataKey::EscrowDispute(dispute.escrow_id));

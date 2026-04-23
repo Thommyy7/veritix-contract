@@ -1,5 +1,7 @@
 use crate::balance::{receive_balance, spend_balance};
-use crate::storage_types::{increment_counter, read_persistent_record, write_persistent_record, DataKey};
+use crate::storage_types::{
+    increment_counter, read_persistent_record, write_persistent_record, DataKey,
+};
 use crate::validation::require_positive_amount;
 use soroban_sdk::{contracttype, symbol_short, Address, Env, Symbol, Vec};
 
@@ -18,6 +20,7 @@ pub struct SplitRecord {
     pub recipients: Vec<SplitRecipient>,
     pub total_amount: i128,
     pub distributed: bool,
+    pub cancelled: bool,
 }
 
 pub fn create_split(
@@ -67,6 +70,7 @@ pub fn create_split(
         recipients,
         total_amount,
         distributed: false,
+        cancelled: false,
     };
     write_persistent_record(e, &DataKey::Split(count), &record);
 
@@ -88,6 +92,9 @@ pub fn distribute(e: &Env, caller: Address, split_id: u32) {
     }
     if record.distributed {
         panic!("already distributed");
+    }
+    if record.cancelled {
+        panic!("split cancelled");
     }
 
     let sender_for_event = record.sender.clone();
@@ -118,8 +125,43 @@ pub fn distribute(e: &Env, caller: Address, split_id: u32) {
 
     // 4. Emit Observability Event
     e.events().publish(
-        (symbol_short!("split_distributed"), split_id, sender_for_event),
+        (
+            symbol_short!("split_distributed"),
+            split_id,
+            sender_for_event,
+        ),
         amount_for_event,
+    );
+}
+
+pub fn cancel_split(e: &Env, caller: Address, split_id: u32) {
+    caller.require_auth();
+
+    let mut record: SplitRecord = e
+        .storage()
+        .persistent()
+        .get(&DataKey::Split(split_id))
+        .expect("split record not found");
+
+    if record.sender != caller {
+        panic!("unauthorized");
+    }
+    if record.distributed {
+        panic!("already distributed");
+    }
+    if record.cancelled {
+        panic!("already cancelled");
+    }
+
+    spend_balance(e, e.current_contract_address(), record.total_amount);
+    receive_balance(e, caller.clone(), record.total_amount);
+
+    record.cancelled = true;
+    write_persistent_record(e, &DataKey::Split(split_id), &record);
+
+    e.events().publish(
+        (symbol_short!("split_cancelled"), split_id, caller),
+        record.total_amount,
     );
 }
 

@@ -57,7 +57,11 @@ pub fn create_escrow(
 
     // Optional observability event
     e.events().publish(
-        (symbol_short!("escrow_created"), depositor.clone(), beneficiary.clone()),
+        (
+            symbol_short!("escrow_created"),
+            depositor.clone(),
+            beneficiary.clone(),
+        ),
         amount,
     );
 
@@ -95,7 +99,11 @@ pub fn try_release_escrow(e: &Env, caller: Address, escrow_id: u32) -> Result<()
 
     // Event for observability
     e.events().publish(
-        (symbol_short!("escrow_released"), escrow_id, escrow.beneficiary.clone()),
+        (
+            symbol_short!("escrow_released"),
+            escrow_id,
+            escrow.beneficiary.clone(),
+        ),
         escrow.amount,
     );
 
@@ -134,7 +142,11 @@ pub fn try_refund_escrow(e: &Env, caller: Address, escrow_id: u32) -> Result<(),
 
     // Event for observability
     e.events().publish(
-        (symbol_short!("escrow_refunded"), escrow_id, escrow.depositor.clone()),
+        (
+            symbol_short!("escrow_refunded"),
+            escrow_id,
+            escrow.depositor.clone(),
+        ),
         escrow.amount,
     );
 

@@ -1,5 +1,5 @@
 use super::*;
-use soroban_sdk::{testutils::Address as _, Address, Env, String};
+use soroban_sdk::{testutils::Address as _, testutils::Events as _, Address, Env, String, Symbol};
 
 use crate::contract::VeritixTokenClient;
 
@@ -13,7 +13,10 @@ fn setup() -> (Env, Address, Address) {
 
 fn create_client_with_id(env: &Env) -> (Address, VeritixTokenClient<'_>) {
     let contract_id = env.register_contract(None, VeritixToken);
-    (contract_id.clone(), VeritixTokenClient::new(env, &contract_id))
+    (
+        contract_id.clone(),
+        VeritixTokenClient::new(env, &contract_id),
+    )
 }
 
 fn create_client(env: &Env) -> VeritixTokenClient<'_> {
@@ -443,4 +446,46 @@ fn test_frozen_account_can_receive_from_escrow_release() {
     client.release_escrow(&user, &escrow_id);
 
     assert_eq!(client.balance(&beneficiary), 1_000i128);
+}
+
+#[test]
+fn test_freeze_and_unfreeze_emit_observable_events() {
+    let (env, admin, user) = setup();
+    env.mock_all_auths();
+    let client = create_client(&env);
+
+    initialize_client(&client, &env, &admin, 7);
+    let _ = env.events().all();
+
+    client.freeze(&user);
+    let freeze_events = env.events().all();
+    assert_eq!(freeze_events.len(), 1);
+    let freeze_event = freeze_events.first().unwrap();
+    assert_eq!(freeze_event.0.len(), 2);
+    assert_eq!(
+        freeze_event.0.get(0).unwrap().into_val(&env),
+        Symbol::new(&env, "frozen")
+    );
+    assert_eq!(
+        freeze_event.0.get(1).unwrap().into_val(&env),
+        user.clone().into()
+    );
+    assert_eq!(freeze_event.1.into_val(&env), admin.clone().into());
+
+    let _ = env.events().all();
+
+    client.unfreeze(&user);
+    let unfreeze_events = env.events().all();
+    assert_eq!(unfreeze_events.len(), 1);
+    let unfreeze_event = unfreeze_events.first().unwrap();
+    assert_eq!(unfreeze_event.0.len(), 2);
+    assert_eq!(
+        unfreeze_event.0.get(0).unwrap().into_val(&env),
+        Symbol::new(&env, "unfrozen")
+    );
+    assert_eq!(
+        unfreeze_event.0.get(1).unwrap().into_val(&env),
+        user.clone().into()
+    );
+    assert_eq!(unfreeze_event.1.into_val(&env), admin.into());
 }
