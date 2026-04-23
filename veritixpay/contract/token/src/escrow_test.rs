@@ -292,6 +292,20 @@ fn test_refund_missing_id_returns_not_found_error() {
 }
 
 #[test]
+#[should_panic(expected = "InvalidEscrow: depositor and beneficiary cannot be the same address")]
+fn test_create_escrow_same_address_panics() {
+    let e = setup_env();
+    let contract_id = e.register_contract(None, VeritixToken);
+    let addr = Address::generate(&e);
+    let amount = 1_000i128;
+
+    e.as_contract(&contract_id, || {
+        crate::balance::receive_balance(&e, addr.clone(), amount);
+        create_escrow(&e, addr.clone(), addr.clone(), amount, 1000);
+    });
+}
+
+#[test]
 #[should_panic]
 fn test_release_unauthorized_panics() {
     let e = setup_env();

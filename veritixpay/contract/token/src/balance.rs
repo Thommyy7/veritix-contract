@@ -53,9 +53,10 @@ pub fn read_total_supply(e: &Env) -> i128 {
 
 pub fn increase_supply(e: &Env, amount: i128) {
     let supply = read_total_supply(e);
+    let new_supply = supply.checked_add(amount).expect("supply overflow");
     e.storage()
         .instance()
-        .set(&DataKey::TotalSupply, &(supply + amount));
+        .set(&DataKey::TotalSupply, &new_supply);
 }
 
 pub fn decrease_supply(e: &Env, amount: i128) {
@@ -63,7 +64,8 @@ pub fn decrease_supply(e: &Env, amount: i128) {
     if supply < amount {
         panic!("supply cannot be negative");
     }
+    let new_supply = supply.checked_sub(amount).expect("supply underflow");
     e.storage()
         .instance()
-        .set(&DataKey::TotalSupply, &(supply - amount));
+        .set(&DataKey::TotalSupply, &new_supply);
 }
