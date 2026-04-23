@@ -32,10 +32,10 @@ fn test_mint_event_schema() {
     let client = create_client(&env);
 
     initialize_client(&client, &env, &admin, 7);
-    
+
     // Clear initialization events
     let _ = env.events().all();
-    
+
     // Mint tokens
     let amount = 1000i128;
     client.mint(&admin, &user, &amount);
@@ -43,13 +43,16 @@ fn test_mint_event_schema() {
     // Verify event structure
     let events = env.events().all();
     assert_eq!(events.len(), 1);
-    
+
     let event = events.first().unwrap();
-    
+
     // Topics should be: [mint_symbol, admin_address, to_address]
     // Payload should be: amount
     assert_eq!(event.0.len(), 3);
-    assert_eq!(event.0.get(0).unwrap().into_val(&env), Symbol::new(&env, "mint"));
+    assert_eq!(
+        event.0.get(0).unwrap().into_val(&env),
+        Symbol::new(&env, "mint")
+    );
     assert_eq!(event.0.get(1).unwrap().into_val(&env), admin.clone().into());
     assert_eq!(event.0.get(2).unwrap().into_val(&env), user.clone().into());
     assert_eq!(event.1.into_val(&env), amount);
@@ -63,10 +66,10 @@ fn test_burn_event_schema() {
 
     initialize_client(&client, &env, &admin, 7);
     client.mint(&admin, &user, &1000i128);
-    
+
     // Clear events
     let _ = env.events().all();
-    
+
     // Burn tokens
     let amount = 500i128;
     client.burn(&user, &amount);
@@ -74,13 +77,16 @@ fn test_burn_event_schema() {
     // Verify event structure
     let events = env.events().all();
     assert_eq!(events.len(), 1);
-    
+
     let event = events.first().unwrap();
-    
+
     // Topics should be: [burn_symbol, from_address]
     // Payload should be: amount
     assert_eq!(event.0.len(), 2);
-    assert_eq!(event.0.get(0).unwrap().into_val(&env), Symbol::new(&env, "burn"));
+    assert_eq!(
+        event.0.get(0).unwrap().into_val(&env),
+        Symbol::new(&env, "burn")
+    );
     assert_eq!(event.0.get(1).unwrap().into_val(&env), user.clone().into());
     assert_eq!(event.1.into_val(&env), amount);
 }
@@ -95,10 +101,10 @@ fn test_burn_from_event_schema() {
     initialize_client(&client, &env, &admin, 7);
     client.mint(&admin, &user, &1000i128);
     client.approve(&user, &spender, &500i128, &1000u32);
-    
+
     // Clear events
     let _ = env.events().all();
-    
+
     // Burn from user's allowance
     let amount = 200i128;
     client.burn_from(&spender, &user, &amount);
@@ -106,14 +112,20 @@ fn test_burn_from_event_schema() {
     // Verify event structure
     let events = env.events().all();
     assert_eq!(events.len(), 1);
-    
+
     let event = events.first().unwrap();
-    
+
     // Topics should be: [burn_symbol, spender_address, from_address]
     // Payload should be: amount
     assert_eq!(event.0.len(), 3);
-    assert_eq!(event.0.get(0).unwrap().into_val(&env), Symbol::new(&env, "burn"));
-    assert_eq!(event.0.get(1).unwrap().into_val(&env), spender.clone().into());
+    assert_eq!(
+        event.0.get(0).unwrap().into_val(&env),
+        Symbol::new(&env, "burn")
+    );
+    assert_eq!(
+        event.0.get(1).unwrap().into_val(&env),
+        spender.clone().into()
+    );
     assert_eq!(event.0.get(2).unwrap().into_val(&env), user.clone().into());
     assert_eq!(event.1.into_val(&env), amount);
 }
@@ -127,10 +139,10 @@ fn test_transfer_event_schema() {
 
     initialize_client(&client, &env, &admin, 7);
     client.mint(&admin, &user, &1000i128);
-    
+
     // Clear events
     let _ = env.events().all();
-    
+
     // Transfer tokens
     let amount = 400i128;
     client.transfer(&user, &receiver, &amount);
@@ -138,15 +150,21 @@ fn test_transfer_event_schema() {
     // Verify event structure
     let events = env.events().all();
     assert_eq!(events.len(), 1);
-    
+
     let event = events.first().unwrap();
-    
+
     // Topics should be: [transfer_symbol, from_address, to_address]
     // Payload should be: amount
     assert_eq!(event.0.len(), 3);
-    assert_eq!(event.0.get(0).unwrap().into_val(&env), Symbol::new(&env, "transfer"));
+    assert_eq!(
+        event.0.get(0).unwrap().into_val(&env),
+        Symbol::new(&env, "transfer")
+    );
     assert_eq!(event.0.get(1).unwrap().into_val(&env), user.clone().into());
-    assert_eq!(event.0.get(2).unwrap().into_val(&env), receiver.clone().into());
+    assert_eq!(
+        event.0.get(2).unwrap().into_val(&env),
+        receiver.clone().into()
+    );
     assert_eq!(event.1.into_val(&env), amount);
 }
 
@@ -161,10 +179,10 @@ fn test_transfer_from_event_schema() {
     initialize_client(&client, &env, &admin, 7);
     client.mint(&admin, &user, &1000i128);
     client.approve(&user, &spender, &500i128, &1000u32);
-    
+
     // Clear events
     let _ = env.events().all();
-    
+
     // Transfer from user's allowance
     let amount = 300i128;
     client.transfer_from(&spender, &user, &receiver, &amount);
@@ -172,15 +190,21 @@ fn test_transfer_from_event_schema() {
     // Verify event structure
     let events = env.events().all();
     assert_eq!(events.len(), 1);
-    
+
     let event = events.first().unwrap();
-    
+
     // Topics should be: [transfer_symbol, from_address, to_address]
     // Payload should be: amount
     assert_eq!(event.0.len(), 3);
-    assert_eq!(event.0.get(0).unwrap().into_val(&env), Symbol::new(&env, "transfer"));
+    assert_eq!(
+        event.0.get(0).unwrap().into_val(&env),
+        Symbol::new(&env, "transfer")
+    );
     assert_eq!(event.0.get(1).unwrap().into_val(&env), user.clone().into());
-    assert_eq!(event.0.get(2).unwrap().into_val(&env), receiver.clone().into());
+    assert_eq!(
+        event.0.get(2).unwrap().into_val(&env),
+        receiver.clone().into()
+    );
     assert_eq!(event.1.into_val(&env), amount);
 }
 
@@ -193,10 +217,10 @@ fn test_approve_event_schema() {
 
     initialize_client(&client, &env, &admin, 7);
     client.mint(&admin, &user, &1000i128);
-    
+
     // Clear events
     let _ = env.events().all();
-    
+
     // Set allowance
     let amount = 400i128;
     let expiration = 1000u32;
@@ -205,15 +229,21 @@ fn test_approve_event_schema() {
     // Verify event structure
     let events = env.events().all();
     assert_eq!(events.len(), 1);
-    
+
     let event = events.first().unwrap();
-    
+
     // Topics should be: [approve_symbol, from_address, spender_address]
     // Payload should be: amount
     assert_eq!(event.0.len(), 3);
-    assert_eq!(event.0.get(0).unwrap().into_val(&env), Symbol::new(&env, "approve"));
+    assert_eq!(
+        event.0.get(0).unwrap().into_val(&env),
+        Symbol::new(&env, "approve")
+    );
     assert_eq!(event.0.get(1).unwrap().into_val(&env), user.clone().into());
-    assert_eq!(event.0.get(2).unwrap().into_val(&env), spender.clone().into());
+    assert_eq!(
+        event.0.get(2).unwrap().into_val(&env),
+        spender.clone().into()
+    );
     assert_eq!(event.1.into_val(&env), amount);
 }
 
@@ -225,10 +255,10 @@ fn test_clawback_event_schema() {
 
     initialize_client(&client, &env, &admin, 7);
     client.mint(&admin, &user, &1000i128);
-    
+
     // Clear events
     let _ = env.events().all();
-    
+
     // Clawback tokens
     let amount = 300i128;
     client.clawback(&admin, &user, &amount);
@@ -236,13 +266,16 @@ fn test_clawback_event_schema() {
     // Verify event structure
     let events = env.events().all();
     assert_eq!(events.len(), 1);
-    
+
     let event = events.first().unwrap();
-    
+
     // Topics should be: [clawback_symbol, admin_address, from_address]
     // Payload should be: amount
     assert_eq!(event.0.len(), 3);
-    assert_eq!(event.0.get(0).unwrap().into_val(&env), Symbol::new(&env, "clawback"));
+    assert_eq!(
+        event.0.get(0).unwrap().into_val(&env),
+        Symbol::new(&env, "clawback")
+    );
     assert_eq!(event.0.get(1).unwrap().into_val(&env), admin.clone().into());
     assert_eq!(event.0.get(2).unwrap().into_val(&env), user.clone().into());
     assert_eq!(event.1.into_val(&env), amount);
@@ -258,16 +291,16 @@ fn test_all_core_events_use_consistent_symbol_short_format() {
 
     initialize_client(&client, &env, &admin, 7);
     client.mint(&admin, &user, &1000i128);
-    
+
     // Clear events
     let _ = env.events().all();
-    
+
     // Execute all core operations
     client.transfer(&user, &receiver, &100i128);
     client.approve(&user, &spender, &200i128, &1000u32);
     client.burn(&user, &50i128);
     client.clawback(&admin, &user, &25i128);
-    
+
     // Verify all events use symbol_short format (single symbol as first topic)
     let events = env.events().all();
     for event in events.iter() {

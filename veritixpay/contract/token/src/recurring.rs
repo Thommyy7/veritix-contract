@@ -26,8 +26,13 @@ pub fn setup_recurring(
     // 1. Validate amount
     require_positive_amount(amount);
 
-    // 2. Authorization: The payer must explicitly authorize this recurring charge
+    if payer == payee {
+        panic!("InvalidRecurring: payer and payee cannot be the same address");
+    }
+
+    // 2. Authorization: both parties must authorize the recurring charge setup.
     payer.require_auth();
+    payee.require_auth();
 
     // 2. Increment and get the new Recurring ID
     let count = increment_counter(e, &DataKey::RecurringCount);
@@ -42,7 +47,9 @@ pub fn setup_recurring(
         last_charged_ledger: e.ledger().sequence(), // Set initial timestamp to now
         active: true,
     };
-    e.storage().persistent().set(&DataKey::Recurring(count), &record);
+    e.storage()
+        .persistent()
+        .set(&DataKey::Recurring(count), &record);
 
     // 4. Emit Observability Event
     e.events().publish(
@@ -113,7 +120,11 @@ pub fn cancel_recurring(e: &Env, caller: Address, recurring_id: u32) {
         .set(&DataKey::Recurring(recurring_id), &record);
 
     e.events().publish(
-        (symbol_short!("recurring_cancelled"), recurring_id, caller.clone()),
+        (
+            symbol_short!("recurring_cancelled"),
+            recurring_id,
+            caller.clone(),
+        ),
         (),
     );
 }

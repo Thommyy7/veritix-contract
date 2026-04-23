@@ -1,9 +1,12 @@
 #[cfg(test)]
 mod recurring_tests {
-    use soroban_sdk::{testutils::Address as _, Address, Env};
+    use soroban_sdk::{
+        testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation},
+        Address, Env, IntoVal,
+    };
 
     use crate::balance::read_balance;
-    use crate::contract::VeritixToken;
+    use crate::contract::{VeritixToken, VeritixTokenClient};
     use crate::recurring::{cancel_recurring, execute_recurring, get_recurring, setup_recurring};
 
     fn setup_env() -> Env {
@@ -26,6 +29,19 @@ mod recurring_tests {
             id = setup_recurring(e, payer.clone(), payee.clone(), amount, interval);
         });
         (payer, payee, id)
+    }
+
+    #[test]
+    #[should_panic(expected = "InvalidRecurring: payer and payee cannot be the same address")]
+    fn test_setup_recurring_same_address_panics() {
+        let e = setup_env();
+        let contract_id = e.register_contract(None, VeritixToken);
+        let addr = Address::generate(&e);
+
+        e.as_contract(&contract_id, || {
+            crate::balance::receive_balance(&e, addr.clone(), 500);
+            setup_recurring(&e, addr.clone(), addr.clone(), 500, 100);
+        });
     }
 
     #[test]
@@ -150,5 +166,47 @@ mod recurring_tests {
             execute_recurring(&e, id);
             assert_eq!(read_balance(&e, payee.clone()), 2_000);
         });
+    }
+
+    #[test]
+    fn test_setup_recurring_requires_both_payer_and_payee_auth() {
+        let e = Env::default();
+        let contract_id = e.register_contract(None, VeritixToken);
+        let client = VeritixTokenClient::new(&e, &contract_id);
+        let payer = Address::generate(&e);
+        let payee = Address::generate(&e);
+        let amount = 500i128;
+        let interval = 100u32;
+
+        e.mock_all_auths();
+        client.setup_recurring(&payer, &payee, &amount, &interval);
+
+        assert_eq!(
+            e.auths(),
+            std::vec![
+                (
+                    payer.clone(),
+                    AuthorizedInvocation {
+                        function: AuthorizedFunction::Contract((
+                            client.address.clone(),
+                            soroban_sdk::symbol_short!("setup_recurring"),
+                            (&payer, &payee, amount, interval).into_val(&e),
+                        )),
+                        sub_invocations: std::vec![],
+                    }
+                ),
+                (
+                    payee.clone(),
+                    AuthorizedInvocation {
+                        function: AuthorizedFunction::Contract((
+                            client.address.clone(),
+                            soroban_sdk::symbol_short!("setup_recurring"),
+                            (&payer, &payee, amount, interval).into_val(&e),
+                        )),
+                        sub_invocations: std::vec![],
+                    }
+                ),
+            ]
+        );
     }
 }

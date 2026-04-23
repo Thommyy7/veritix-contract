@@ -26,9 +26,11 @@ pub fn read_allowance(e: &Env, from: Address, spender: Address) -> AllowanceValu
             }
         } else {
             // Extend TTL on active allowance read
-            e.storage()
-                .persistent()
-                .extend_ttl(&key, ALLOWANCE_LIFETIME_THRESHOLD, ALLOWANCE_BUMP_AMOUNT);
+            e.storage().persistent().extend_ttl(
+                &key,
+                ALLOWANCE_LIFETIME_THRESHOLD,
+                ALLOWANCE_BUMP_AMOUNT,
+            );
             allowance
         }
     } else {
