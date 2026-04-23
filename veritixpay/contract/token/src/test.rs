@@ -51,7 +51,7 @@ fn test_initialize() {
 }
 
 #[test]
-#[ignore = "Panics abort in this Soroban test configuration"]
+#[should_panic]
 fn test_initialize_twice_panics() {
     let (env, admin, _user) = setup();
     env.mock_all_auths();
@@ -62,7 +62,7 @@ fn test_initialize_twice_panics() {
 }
 
 #[test]
-#[ignore = "Panics abort in this Soroban test configuration"]
+#[should_panic]
 fn test_initialize_rejects_decimal_above_eighteen() {
     let (env, admin, _user) = setup();
     env.mock_all_auths();
@@ -72,7 +72,7 @@ fn test_initialize_rejects_decimal_above_eighteen() {
 }
 
 #[test]
-#[ignore = "Panics abort in this Soroban test configuration"]
+#[should_panic]
 fn test_initialize_rejects_empty_name() {
     let (env, admin, _user) = setup();
     env.mock_all_auths();
@@ -87,7 +87,7 @@ fn test_initialize_rejects_empty_name() {
 }
 
 #[test]
-#[ignore = "Panics abort in this Soroban test configuration"]
+#[should_panic]
 fn test_initialize_rejects_empty_symbol() {
     let (env, admin, _user) = setup();
     env.mock_all_auths();
@@ -102,7 +102,7 @@ fn test_initialize_rejects_empty_symbol() {
 }
 
 #[test]
-#[ignore = "Panics abort in this Soroban test configuration"]
+#[should_panic]
 fn test_initialize_requires_admin_authorization() {
     let (env, admin, _user) = setup();
     let client = create_client(&env);
@@ -124,7 +124,7 @@ fn test_mint() {
 }
 
 #[test]
-#[ignore = "Panics abort in this Soroban test configuration"]
+#[should_panic]
 fn test_mint_unauthorized_panics() {
     let (env, admin, user) = setup();
     env.mock_all_auths();
@@ -152,7 +152,7 @@ fn test_burn() {
 }
 
 #[test]
-#[ignore = "Panics abort in this Soroban test configuration"]
+#[should_panic]
 fn test_burn_insufficient_panics() {
     let (env, admin, user) = setup();
     env.mock_all_auths();
@@ -181,7 +181,7 @@ fn test_transfer() {
 }
 
 #[test]
-#[ignore = "Panics abort in this Soroban test configuration"]
+#[should_panic]
 fn test_transfer_insufficient_balance_panics() {
     let (env, admin, user) = setup();
     env.mock_all_auths();
@@ -262,7 +262,7 @@ fn test_allowance_expiration_equal_current_ledger_is_valid_for_current_ledger() 
 }
 
 #[test]
-#[ignore = "Panics abort in this Soroban test configuration"]
+#[should_panic]
 fn test_expired_allowance_panics() {
     let (env, admin, user) = setup();
     env.mock_all_auths();
@@ -394,7 +394,7 @@ fn test_core_token_operations_preserve_supply_invariant() {
 }
 
 #[test]
-#[ignore = "Panics abort in this Soroban test configuration"]
+#[should_panic]
 fn test_clawback_unauthorized_panics() {
     let (env, admin, user) = setup();
     env.mock_all_auths();
@@ -421,7 +421,7 @@ fn test_frozen_account_can_receive_from_escrow_release() {
     client.freeze(&beneficiary);
     assert!(client.is_frozen(&beneficiary));
 
-    let escrow_id = client.create_escrow(&user, &beneficiary, &1_000i128);
+    let escrow_id = client.create_escrow(&user, &beneficiary, &1_000i128, &1000u32);
 
     // Release escrow to the frozen beneficiary — must not panic.
     client.release_escrow(&user, &escrow_id);

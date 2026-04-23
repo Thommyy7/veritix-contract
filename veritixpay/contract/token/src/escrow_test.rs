@@ -37,7 +37,7 @@ fn test_create_escrow_stores_record() {
         // Pre-fund depositor so spend_balance in create_escrow succeeds.
         crate::balance::receive_balance(&e, depositor.clone(), amount);
 
-        escrow_id = create_escrow(&e, depositor.clone(), beneficiary.clone(), amount);
+        escrow_id = create_escrow(&e, depositor.clone(), beneficiary.clone(), amount, 1000);
         let record = get_escrow(&e, escrow_id);
 
         assert_eq!(record.id, escrow_id);
@@ -63,7 +63,7 @@ fn test_release_escrow_happy_path() {
     let mut escrow_id: u32 = 0;
     e.as_contract(&contract_id, || {
         crate::balance::receive_balance(&e, depositor.clone(), amount);
-        escrow_id = create_escrow(&e, depositor.clone(), beneficiary.clone(), amount);
+        escrow_id = create_escrow(&e, depositor.clone(), beneficiary.clone(), amount, 1000);
     });
 
     // Second call: release the escrow and check balances.
@@ -105,7 +105,7 @@ fn test_refund_escrow_happy_path() {
     let mut escrow_id: u32 = 0;
     e.as_contract(&contract_id, || {
         crate::balance::receive_balance(&e, depositor.clone(), amount);
-        escrow_id = create_escrow(&e, depositor.clone(), beneficiary.clone(), amount);
+        escrow_id = create_escrow(&e, depositor.clone(), beneficiary.clone(), amount, 1000);
     });
 
     // Second call: refund the escrow and check balances.
@@ -147,7 +147,7 @@ fn test_escrow_create_and_release_preserve_supply_invariant() {
             &[depositor.clone(), beneficiary.clone(), e.current_contract_address()],
         );
 
-        escrow_id = create_escrow(&e, depositor.clone(), beneficiary.clone(), amount);
+        escrow_id = create_escrow(&e, depositor.clone(), beneficiary.clone(), amount, 1000);
         assert_supply_matches_balances(
             &e,
             &[depositor.clone(), beneficiary.clone(), e.current_contract_address()],
@@ -180,7 +180,7 @@ fn test_escrow_create_and_refund_preserve_supply_invariant() {
             &[depositor.clone(), beneficiary.clone(), e.current_contract_address()],
         );
 
-        escrow_id = create_escrow(&e, depositor.clone(), beneficiary.clone(), amount);
+        escrow_id = create_escrow(&e, depositor.clone(), beneficiary.clone(), amount, 1000);
         assert_supply_matches_balances(
             &e,
             &[depositor.clone(), beneficiary.clone(), e.current_contract_address()],
@@ -206,14 +206,14 @@ fn test_create_escrow_increments_counter() {
     let depositor_one = Address::generate(&e);
     e.as_contract(&contract_id, || {
         crate::balance::receive_balance(&e, depositor_one.clone(), amount);
-        let escrow_id = create_escrow(&e, depositor_one.clone(), beneficiary.clone(), amount);
+        let escrow_id = create_escrow(&e, depositor_one.clone(), beneficiary.clone(), amount, 1000);
         assert_eq!(escrow_id, 1);
     });
 
     let depositor_two = Address::generate(&e);
     e.as_contract(&contract_id, || {
         crate::balance::receive_balance(&e, depositor_two.clone(), amount);
-        let escrow_id = create_escrow(&e, depositor_two.clone(), beneficiary.clone(), amount);
+        let escrow_id = create_escrow(&e, depositor_two.clone(), beneficiary.clone(), amount, 1000);
         assert_eq!(escrow_id, 2);
     });
 
@@ -240,7 +240,7 @@ fn test_escrow_count_getter_reflects_creations() {
     let depositor_one = Address::generate(&e);
     e.as_contract(&contract_id, || {
         crate::balance::receive_balance(&e, depositor_one.clone(), amount);
-        let _ = VeritixToken::create_escrow(e.clone(), depositor_one.clone(), beneficiary.clone(), amount);
+        let _ = VeritixToken::create_escrow(e.clone(), depositor_one.clone(), beneficiary.clone(), amount, 1000);
         assert_eq!(VeritixToken::escrow_count(e.clone()), 1);
     });
 
@@ -248,7 +248,7 @@ fn test_escrow_count_getter_reflects_creations() {
     let depositor_two = Address::generate(&e);
     e.as_contract(&contract_id, || {
         crate::balance::receive_balance(&e, depositor_two.clone(), amount);
-        let _ = VeritixToken::create_escrow(e.clone(), depositor_two.clone(), beneficiary.clone(), amount);
+        let _ = VeritixToken::create_escrow(e.clone(), depositor_two.clone(), beneficiary.clone(), amount, 1000);
         assert_eq!(VeritixToken::escrow_count(e.clone()), 2);
     });
 }
@@ -292,7 +292,7 @@ fn test_refund_missing_id_returns_not_found_error() {
 }
 
 #[test]
-#[ignore] // Disabled: panics abort in this test configuration
+#[should_panic]
 fn test_release_unauthorized_panics() {
     let e = setup_env();
     let depositor = Address::generate(&e);
@@ -302,14 +302,14 @@ fn test_release_unauthorized_panics() {
 
     crate::balance::receive_balance(&e, depositor.clone(), amount);
 
-    let escrow_id = create_escrow(&e, depositor, beneficiary, amount);
+    let escrow_id = create_escrow(&e, depositor, beneficiary, amount, 1000);
 
     // Hacker (not beneficiary) tries to release.
     release_escrow(&e, hacker, escrow_id);
 }
 
 #[test]
-#[ignore] // Disabled: panics abort in this test configuration
+#[should_panic]
 fn test_refund_unauthorized_panics() {
     let e = setup_env();
     let depositor = Address::generate(&e);
@@ -318,14 +318,14 @@ fn test_refund_unauthorized_panics() {
 
     crate::balance::receive_balance(&e, depositor.clone(), amount);
 
-    let escrow_id = create_escrow(&e, depositor, beneficiary.clone(), amount);
+    let escrow_id = create_escrow(&e, depositor, beneficiary.clone(), amount, 1000);
 
     // Beneficiary (not depositor) tries to refund.
     refund_escrow(&e, beneficiary, escrow_id);
 }
 
 #[test]
-#[ignore] // Disabled: panics abort in this test configuration
+#[should_panic]
 fn test_double_release_panics() {
     let e = setup_env();
     let depositor = Address::generate(&e);
@@ -334,7 +334,7 @@ fn test_double_release_panics() {
 
     crate::balance::receive_balance(&e, depositor.clone(), amount);
 
-    let escrow_id = create_escrow(&e, depositor, beneficiary.clone(), amount);
+    let escrow_id = create_escrow(&e, depositor, beneficiary.clone(), amount, 1000);
 
     release_escrow(&e, beneficiary.clone(), escrow_id);
     // Second release should panic.
@@ -342,7 +342,7 @@ fn test_double_release_panics() {
 }
 
 #[test]
-#[ignore] // Disabled: panics abort in this test configuration
+#[should_panic]
 fn test_double_refund_panics() {
     let e = setup_env();
     let depositor = Address::generate(&e);
@@ -351,7 +351,7 @@ fn test_double_refund_panics() {
 
     crate::balance::receive_balance(&e, depositor.clone(), amount);
 
-    let escrow_id = create_escrow(&e, depositor.clone(), beneficiary, amount);
+    let escrow_id = create_escrow(&e, depositor.clone(), beneficiary, amount, 1000);
 
     refund_escrow(&e, depositor.clone(), escrow_id);
     // Second refund should panic.
@@ -359,7 +359,7 @@ fn test_double_refund_panics() {
 }
 
 #[test]
-#[ignore] // Disabled: panics abort in this test configuration
+#[should_panic]
 fn test_release_after_refund_panics() {
     let e = setup_env();
     let depositor = Address::generate(&e);
@@ -368,7 +368,7 @@ fn test_release_after_refund_panics() {
 
     crate::balance::receive_balance(&e, depositor.clone(), amount);
 
-    let escrow_id = create_escrow(&e, depositor.clone(), beneficiary.clone(), amount);
+    let escrow_id = create_escrow(&e, depositor.clone(), beneficiary.clone(), amount, 1000);
 
     refund_escrow(&e, depositor, escrow_id);
     // Any attempt to release after refund should panic.
