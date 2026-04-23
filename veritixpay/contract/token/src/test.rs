@@ -406,3 +406,25 @@ fn test_clawback_unauthorized_panics() {
 
     client.clawback(&user, &user, &300i128);
 }
+
+#[test]
+fn test_frozen_account_can_receive_from_escrow_release() {
+    let (env, admin, user) = setup();
+    env.mock_all_auths();
+    let client = create_client(&env);
+    let beneficiary = Address::generate(&env);
+
+    initialize_client(&client, &env, &admin, 7);
+    client.mint(&admin, &user, &1_000i128);
+
+    // Freeze the beneficiary — they should still be able to receive escrowed funds.
+    client.freeze(&beneficiary);
+    assert!(client.is_frozen(&beneficiary));
+
+    let escrow_id = client.create_escrow(&user, &beneficiary, &1_000i128);
+
+    // Release escrow to the frozen beneficiary — must not panic.
+    client.release_escrow(&user, &escrow_id);
+
+    assert_eq!(client.balance(&beneficiary), 1_000i128);
+}
