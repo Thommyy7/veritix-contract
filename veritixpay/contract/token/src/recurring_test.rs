@@ -32,6 +32,19 @@ mod recurring_tests {
     }
 
     #[test]
+    #[should_panic(expected = "InvalidRecurring: payer and payee cannot be the same address")]
+    fn test_setup_recurring_same_address_panics() {
+        let e = setup_env();
+        let contract_id = e.register_contract(None, VeritixToken);
+        let addr = Address::generate(&e);
+
+        e.as_contract(&contract_id, || {
+            crate::balance::receive_balance(&e, addr.clone(), 500);
+            setup_recurring(&e, addr.clone(), addr.clone(), 500, 100);
+        });
+    }
+
+    #[test]
     fn test_setup_stores_record() {
         let e = setup_env();
         let contract_id = e.register_contract(None, VeritixToken);

@@ -266,6 +266,22 @@ fn test_allowance_expiration_equal_current_ledger_is_valid_for_current_ledger() 
 
 #[test]
 #[should_panic]
+fn test_approve_with_past_expiration_panics() {
+    let (env, admin, user) = setup();
+    env.mock_all_auths();
+    let client = create_client(&env);
+    let spender = Address::generate(&env);
+
+    initialize_client(&client, &env, &admin, 7);
+    client.mint(&admin, &user, &1000i128);
+
+    // Advance ledger so that expiration_ledger = 0 is strictly in the past.
+    env.ledger().set_sequence_number(10);
+    client.approve(&user, &spender, &400i128, &0u32);
+}
+
+#[test]
+#[should_panic]
 fn test_expired_allowance_panics() {
     let (env, admin, user) = setup();
     env.mock_all_auths();

@@ -29,6 +29,10 @@ pub fn create_escrow(
     require_positive_amount(amount);
     require_current_or_future_ledger(e.ledger().sequence(), expiry_ledger);
 
+    if depositor == beneficiary {
+        panic!("InvalidEscrow: depositor and beneficiary cannot be the same address");
+    }
+
     // Auth: depositor must authorize locking funds
     depositor.require_auth();
 

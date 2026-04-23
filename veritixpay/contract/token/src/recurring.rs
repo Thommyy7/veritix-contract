@@ -26,6 +26,10 @@ pub fn setup_recurring(
     // 1. Validate amount
     require_positive_amount(amount);
 
+    if payer == payee {
+        panic!("InvalidRecurring: payer and payee cannot be the same address");
+    }
+
     // 2. Authorization: both parties must authorize the recurring charge setup.
     payer.require_auth();
     payee.require_auth();
