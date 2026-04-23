@@ -2,7 +2,7 @@ use crate::balance::{receive_balance, spend_balance};
 use crate::storage_types::{
     increment_counter, read_persistent_record, write_persistent_record, DataKey,
 };
-use crate::validation::require_positive_amount;
+use crate::validation::{require_current_or_future_ledger, require_positive_amount};
 use soroban_sdk::{contracttype, symbol_short, Address, Env, Symbol};
 
 #[contracttype]
@@ -14,12 +14,20 @@ pub struct EscrowRecord {
     pub amount: i128,
     pub released: bool,
     pub refunded: bool,
+    pub expiry_ledger: u32,
 }
 
 // Lock funds from depositor into escrow. The contract address itself holds the
 // escrowed balance until the record is released or refunded. Returns the escrow ID.
-pub fn create_escrow(e: &Env, depositor: Address, beneficiary: Address, amount: i128) -> u32 {
+pub fn create_escrow(
+    e: &Env,
+    depositor: Address,
+    beneficiary: Address,
+    amount: i128,
+    expiry_ledger: u32,
+) -> u32 {
     require_positive_amount(amount);
+    require_current_or_future_ledger(e.ledger().sequence(), expiry_ledger);
 
     // Auth: depositor must authorize locking funds
     depositor.require_auth();
@@ -39,6 +47,7 @@ pub fn create_escrow(e: &Env, depositor: Address, beneficiary: Address, amount: 
         amount,
         released: false,
         refunded: false,
+        expiry_ledger,
     };
     write_persistent_record(e, &DataKey::Escrow(count), &record);
 
@@ -108,8 +117,9 @@ pub fn try_refund_escrow(e: &Env, caller: Address, escrow_id: u32) -> Result<(),
 
     let mut escrow = try_get_escrow(e, escrow_id)?;
 
-    // Authorization: only the original depositor can refund
-    if escrow.depositor != caller {
+    // Authorization: only the original depositor can refund, unless the escrow has expired
+    let expired = e.ledger().sequence() > escrow.expiry_ledger;
+    if escrow.depositor != caller && !expired {
         return Err("not depositor");
     }
 

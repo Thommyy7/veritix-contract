@@ -188,8 +188,8 @@ impl VeritixToken {
 
     // --- Escrow ---
 
-    pub fn create_escrow(e: Env, depositor: Address, beneficiary: Address, amount: i128) -> u32 {
-        escrow_create(&e, depositor, beneficiary, amount)
+    pub fn create_escrow(e: Env, depositor: Address, beneficiary: Address, amount: i128, expiry_ledger: u32) -> u32 {
+        escrow_create(&e, depositor, beneficiary, amount, expiry_ledger)
     }
 
     pub fn release_escrow(e: Env, caller: Address, escrow_id: u32) {

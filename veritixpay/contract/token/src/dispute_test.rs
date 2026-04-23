@@ -18,7 +18,7 @@ fn setup_escrow(e: &Env, contract_id: &Address) -> (Address, Address, u32) {
     let mut escrow_id = 0u32;
     e.as_contract(contract_id, || {
         crate::balance::receive_balance(e, depositor.clone(), amount);
-        escrow_id = create_escrow(e, depositor.clone(), beneficiary.clone(), amount);
+        escrow_id = create_escrow(e, depositor.clone(), beneficiary.clone(), amount, 1000);
     });
     (depositor, beneficiary, escrow_id)
 }

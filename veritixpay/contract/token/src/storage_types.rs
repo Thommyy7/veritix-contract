@@ -40,10 +40,6 @@ pub enum DataKey {
     // Tracks the active dispute ID for a given escrow (None = no open dispute).
     EscrowDispute(u32),
 
-    // Reserved for future multi-escrow support.
-    MultiEscrowCount,
-    MultiEscrow(u32),
-
     // Stores per-address freeze status.
     Freeze(Address),
 }

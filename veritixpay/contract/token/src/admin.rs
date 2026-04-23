@@ -1,4 +1,4 @@
-use soroban_sdk::{Address, Env};
+use soroban_sdk::{symbol_short, Address, Env};
 
 use crate::storage_types::DataKey;
 
@@ -30,4 +30,8 @@ pub fn transfer_admin(e: &Env, new_admin: Address) {
     let current_admin = read_admin(e);
     current_admin.require_auth();
     write_admin(e, &new_admin);
+    e.events().publish(
+        (symbol_short!("admin_set"), current_admin),
+        new_admin,
+    );
 }
